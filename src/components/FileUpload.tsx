@@ -131,11 +131,12 @@ export default function FileUpload({ userId, onUploadSuccess }: FileUploadProps)
         onDragOver={handleDrag}
         onDragLeave={handleDrag}
         onDrop={handleDrop}
+        onClick={status === 'idle' ? onButtonClick : undefined}
         className={`relative w-full rounded-2xl glass-panel p-8 text-center transition-all duration-300 ${
           dragActive
             ? 'border-blue-500 bg-blue-600/5 shadow-[0_0_20px_rgba(37,99,235,0.15)]'
             : 'border-white/10 hover:border-white/20 hover:bg-white/[0.01]'
-        }`}
+        } ${status === 'idle' ? 'cursor-pointer' : ''}`}
       >
         <input
           ref={inputRef}

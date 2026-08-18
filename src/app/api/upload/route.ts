@@ -3,7 +3,7 @@ import { createServerSideClient } from '@/lib/supabase/server'
 import { extractTextFromFile } from '@/lib/fileParser'
 import { validateEnv } from '@/lib/env'
 
-function chunkText(text: string, chunkSize = 2000): string[] {
+function chunkText(text: string, chunkSize = 500): string[] {
   const words = text.split(/\s+/)
   const chunks: string[] = []
   for (let i = 0; i < words.length; i += chunkSize) {
@@ -20,13 +20,29 @@ function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-async function fetchWithRetry(url: string, options: RequestInit, retries = 5, backoff = 4000): Promise<Response> {
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 3,
+  initialBackoff = 1000
+): Promise<Response> {
+  let backoff = initialBackoff
   for (let i = 0; i < retries; i++) {
     const res = await fetch(url, options)
     if (res.status === 429) {
-      console.warn(`Voyage AI 429 Rate Limit hit. Retrying in ${backoff}ms (attempt ${i + 1}/${retries})...`)
-      await new Promise((resolve) => setTimeout(resolve, backoff))
-      backoff *= 2.0
+      const errorText = await res.text()
+      let friendlyError = `Rate limited. Retrying in ${backoff}ms...`
+      try {
+        const parsed = JSON.parse(errorText)
+        if (parsed.detail && parsed.detail.includes('payment method')) {
+          friendlyError = 'Voyage AI Free Tier Limit: Add a billing card at https://dashboard.voyageai.com to unlock higher limits, or wait before retrying.'
+        }
+      } catch (_) {}
+      console.warn(`Voyage AI 429: ${friendlyError} (attempt ${i + 1}/${retries})`)
+      if (i < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, backoff))
+        backoff *= 1.5
+      }
       continue
     }
     return res
@@ -36,43 +52,49 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 5, ba
 
 async function getEmbeddings(texts: string[]): Promise<number[][]> {
   validateEnv()
-  const batchSize = 128
-  const promises: Promise<number[][]>[] = []
+  const batchSize = 12
+  const embeddings: number[][] = []
 
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize)
-    promises.push(
-      (async () => {
-        const res = await fetchWithRetry('https://api.voyageai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${process.env.VOYAGE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ input: batch, model: 'voyage-3' }),
-        })
 
-        if (!res.ok) {
-          const errorText = await res.text()
-          if (res.status === 429) {
-            try {
-              const parsed = JSON.parse(errorText)
-              if (parsed.detail && parsed.detail.includes('payment method')) {
-                throw new Error('Voyage AI Rate Limit: Please add a billing card in your Voyage AI Dashboard (https://dashboard.voyageai.com) to unlock standard rate limits, or wait 1 minute before uploading.')
-              }
-            } catch (_) {}
+    const res = await fetchWithRetry('https://api.voyageai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.VOYAGE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ input: batch, model: 'voyage-3' }),
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      if (res.status === 429) {
+        try {
+          const parsed = JSON.parse(errorText)
+          if (parsed.detail && parsed.detail.includes('payment method')) {
+            throw new Error(
+              'Voyage AI Free Tier Rate Limit Exceeded (3 RPM). ' +
+              'Please add a billing card in your Voyage AI Dashboard (https://dashboard.voyageai.com) ' +
+              'to unlock standard rate limits, or wait 1+ minute before uploading another document.'
+            )
           }
-          throw new Error(`Voyage AI API error: ${res.status} ${errorText}`)
-        }
+        } catch (_) {}
+      }
+      throw new Error(`Voyage AI API error: ${res.status} ${errorText}`)
+    }
 
-        const data = await res.json()
-        return data.data.map((item: any) => item.embedding)
-      })()
-    )
+    const data = await res.json()
+    const batchEmbeddings = data.data.map((item: any) => item.embedding)
+    embeddings.push(...batchEmbeddings)
+
+    // Small delay between batches to respect free tier rate limits
+    if (i + batchSize < texts.length) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
   }
 
-  const results = await Promise.all(promises)
-  return results.flat()
+  return embeddings
 }
 
 export async function POST(req: Request) {
@@ -85,7 +107,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
     }
 
-    // File validation
     const allowedExtensions = ['pdf', 'docx', 'txt', 'md', 'csv']
     const extension = file.name.split('.').pop()?.toLowerCase() || ''
 
@@ -96,8 +117,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // File size limit (10MB)
-    const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+    const MAX_SIZE = 10 * 1024 * 1024
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
         { error: `File is too large (max 10MB). Your file: ${formatFileSize(file.size)}` },
@@ -106,15 +126,12 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
-
-    // Extract text dynamically using our multi-format file parser
     const extractedText = await extractTextFromFile(file.name, file.type, buffer)
 
     if (!extractedText || extractedText.trim().length === 0) {
       return NextResponse.json({ error: 'Could not extract text from document' }, { status: 400 })
     }
 
-    // Clean text: replace multiple spaces/newlines with a single space
     const cleanText = extractedText.replace(/\s+/g, ' ').trim()
     const chunks = chunkText(cleanText)
 
@@ -125,8 +142,6 @@ export async function POST(req: Request) {
     validateEnv()
 
     const supabase = await createServerSideClient()
-
-    // Retrieve actual user session for security
     const { data: { user } } = await supabase.auth.getUser()
     const userId = user?.id || userIdInput
 
@@ -134,10 +149,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized: No user ID found' }, { status: 401 })
     }
 
-    // Call Voyage AI embeddings in batch with dynamic rate-limiting retry
     const embeddings = await getEmbeddings(chunks)
 
-    // Store chunks and embeddings in Supabase
     const dbPayload = chunks.map((chunk, index) => ({
       user_id: userId,
       document_name: file.name,
@@ -172,8 +185,6 @@ export async function DELETE(req: Request) {
     validateEnv()
 
     const supabase = await createServerSideClient()
-
-    // Retrieve actual user session for security
     const { data: { user } } = await supabase.auth.getUser()
     const userId = user?.id || userIdInput
 
@@ -181,7 +192,6 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Unauthorized: No user ID found' }, { status: 401 })
     }
 
-    // Delete all chunks for this document
     const { error } = await supabase
       .from('document_chunks')
       .delete()

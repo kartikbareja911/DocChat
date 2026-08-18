@@ -28,13 +28,24 @@ function checkRateLimit(key: string, limit = 10, windowMs = 60000): { allowed: b
   return { allowed: true, resetAt: entry.lastAttempt + windowMs }
 }
 
-async function fetchWithRetry(url: string, options: RequestInit, retries = 5, backoff = 5000): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, initialBackoff = 1000): Promise<Response> {
+  let backoff = initialBackoff
   for (let i = 0; i < retries; i++) {
     const res = await fetch(url, options)
     if (res.status === 429) {
-      console.warn(`Voyage AI 429 Rate Limit hit. Retrying in ${backoff}ms (attempt ${i + 1}/${retries})...`)
-      await new Promise((resolve) => setTimeout(resolve, backoff))
-      backoff *= 1.5
+      const errorText = await res.text()
+      let friendlyError = `Rate limited. Retrying in ${backoff}ms...`
+      try {
+        const parsed = JSON.parse(errorText)
+        if (parsed.detail && parsed.detail.includes('payment method')) {
+          friendlyError = 'Voyage AI Free Tier Limit: Add a billing card at https://dashboard.voyageai.com to unlock higher limits, or wait before retrying.'
+        }
+      } catch (_) {}
+      console.warn(`Voyage AI 429: ${friendlyError} (attempt ${i + 1}/${retries})`)
+      if (i < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, backoff))
+        backoff *= 1.5
+      }
       continue
     }
     return res
