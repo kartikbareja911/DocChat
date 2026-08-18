@@ -37,39 +37,42 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 5, ba
 async function getEmbeddings(texts: string[]): Promise<number[][]> {
   validateEnv()
   const batchSize = 128
-  const embeddings: number[][] = []
+  const promises: Promise<number[][]>[] = []
 
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize)
+    promises.push(
+      (async () => {
+        const res = await fetchWithRetry('https://api.voyageai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.VOYAGE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ input: batch, model: 'voyage-3' }),
+        })
 
-    const res = await fetchWithRetry('https://api.voyageai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.VOYAGE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ input: batch, model: 'voyage-3' }),
-    })
-
-    if (!res.ok) {
-      const errorText = await res.text()
-      if (res.status === 429) {
-        try {
-          const parsed = JSON.parse(errorText)
-          if (parsed.detail && parsed.detail.includes('payment method')) {
-            throw new Error('Voyage AI Rate Limit: Please add a billing card in your Voyage AI Dashboard (https://dashboard.voyageai.com) to unlock standard rate limits, or wait 1 minute before uploading.')
+        if (!res.ok) {
+          const errorText = await res.text()
+          if (res.status === 429) {
+            try {
+              const parsed = JSON.parse(errorText)
+              if (parsed.detail && parsed.detail.includes('payment method')) {
+                throw new Error('Voyage AI Rate Limit: Please add a billing card in your Voyage AI Dashboard (https://dashboard.voyageai.com) to unlock standard rate limits, or wait 1 minute before uploading.')
+              }
+            } catch (_) {}
           }
-        } catch (_) {}
-      }
-      throw new Error(`Voyage AI API error: ${res.status} ${errorText}`)
-    }
+          throw new Error(`Voyage AI API error: ${res.status} ${errorText}`)
+        }
 
-    const data = await res.json()
-    const batchEmbeddings = data.data.map((item: any) => item.embedding)
-    embeddings.push(...batchEmbeddings)
+        const data = await res.json()
+        return data.data.map((item: any) => item.embedding)
+      })()
+    )
   }
 
-  return embeddings
+  const results = await Promise.all(promises)
+  return results.flat()
 }
 
 export async function POST(req: Request) {
