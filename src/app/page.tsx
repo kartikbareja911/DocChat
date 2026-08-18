@@ -323,7 +323,13 @@ export default function Home() {
 
       {/* Navigation Header */}
       <header className="sticky top-0 z-50 max-w-7xl w-full mx-auto px-6 py-5 flex items-center justify-between border-b border-white/5 bg-[#0B0B0C]/80 backdrop-blur-md">
-        <div className="flex items-center space-x-2">
+        <button
+          onClick={() => {
+            setSelectedDoc(null)
+            setActiveSessionId(null)
+          }}
+          className="flex items-center space-x-2 cursor-pointer focus:outline-none hover:opacity-90 transition-all text-left"
+        >
           {/* Unique Logo - Document + Chat Bubble + AI Sparkle */}
           <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(37,99,235,0.4)] p-2">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" className="h-full w-full text-white">
@@ -345,7 +351,7 @@ export default function Home() {
               AI
             </span>
           </span>
-        </div>
+        </button>
 
         {/* Hover Dropdown User logout on Top Right */}
         {user && (
