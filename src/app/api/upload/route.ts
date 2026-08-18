@@ -36,7 +36,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 5, ba
 
 async function getEmbeddings(texts: string[]): Promise<number[][]> {
   validateEnv()
-  const batchSize = 12
+  const batchSize = 128
   const embeddings: number[][] = []
 
   for (let i = 0; i < texts.length; i += batchSize) {
