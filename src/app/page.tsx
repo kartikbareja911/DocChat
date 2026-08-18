@@ -555,7 +555,7 @@ export default function Home() {
                     {uploadedDocs.length === 0 ? 'No documents indexed yet.' : 'No matching files found.'}
                   </p>
                 ) : (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1 overscroll-contain">
                     {filteredDocs.map((doc, idx) => {
                       const isSelected = selectedDoc === doc.name
                       const isDeleting = deletingDocs.includes(doc.name)
@@ -629,7 +629,7 @@ export default function Home() {
                 ) : sessions.length === 0 ? (
                   <p className="text-xs text-gray-500 italic py-2">No past conversations.</p>
                 ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1 overscroll-contain">
                     {sessions.map((sess) => {
                       const isActive = activeSessionId === sess.id
                       return (

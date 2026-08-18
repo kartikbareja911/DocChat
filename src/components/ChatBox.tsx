@@ -328,7 +328,7 @@ export default function ChatBox({
       </div>
 
       {/* Messages Area */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6 overscroll-contain">
         {historyLoading ? (
           <div className="h-full flex flex-col items-center justify-center space-y-3">
             <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
@@ -387,7 +387,7 @@ export default function ChatBox({
                         return (
                           <div
                             key={src.id}
-                            className="rounded-full bg-white/[0.01] border border-white/[0.05] overflow-hidden transition-all duration-200 hover:border-white/10"
+                            className="rounded-xl bg-white/[0.01] border border-white/[0.05] overflow-hidden transition-all duration-200 hover:border-white/10"
                           >
                             <button
                               onClick={() => toggleSource(`${idx}-${sIdx}`)}
