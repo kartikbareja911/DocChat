@@ -235,6 +235,11 @@ export default function ChatBox({
         return
       }
 
+      if (file.size > 4.5 * 1024 * 1024) {
+        alert('File is too large. Vercel serverless hosting limits file uploads to a maximum of 4.5 MB.')
+        return
+      }
+
       setUploadingFileName(file.name)
 
       const formatFileSize = (bytes: number): string => {
@@ -258,6 +263,15 @@ export default function ChatBox({
           method: 'POST',
           body: formData,
         })
+
+        if (response.status === 413) {
+          throw new Error('File exceeds the 4.5 MB size limit permitted by our serverless host.')
+        }
+
+        const contentType = response.headers.get('content-type')
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error(`Server returned an unexpected response (status ${response.status}).`)
+        }
 
         const data = await response.json()
 

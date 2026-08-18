@@ -45,6 +45,12 @@ export default function FileUpload({ userId, onUploadSuccess }: FileUploadProps)
       return
     }
 
+    if (file.size > 4.5 * 1024 * 1024) {
+      setStatus('error')
+      setErrorMessage('File is too large. Vercel serverless hosting limits file uploads to a maximum of 4.5 MB.')
+      return
+    }
+
     const sizeStr = formatFileSize(file.size)
     setFileDetails({
       name: file.name,
@@ -65,6 +71,15 @@ export default function FileUpload({ userId, onUploadSuccess }: FileUploadProps)
         method: 'POST',
         body: formData,
       })
+
+      if (response.status === 413) {
+        throw new Error('File exceeds the 4.5 MB size limit permitted by our serverless host.')
+      }
+
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Server returned an unexpected response (status ${response.status}).`)
+      }
 
       const data = await response.json()
 
@@ -145,7 +160,7 @@ export default function FileUpload({ userId, onUploadSuccess }: FileUploadProps)
               </button>{' '}
               <span className="text-gray-400">or drag and drop</span>
             </div>
-            <p className="text-xs text-gray-500">PDF, DOCX, TXT, MD, CSV (max 10MB)</p>
+            <p className="text-xs text-gray-500">PDF, DOCX, TXT, MD, CSV (max 4.5MB)</p>
           </div>
         )}
 
