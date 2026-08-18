@@ -3,7 +3,7 @@ import { createServerSideClient } from '@/lib/supabase/server'
 import { extractTextFromFile } from '@/lib/fileParser'
 import { validateEnv } from '@/lib/env'
 
-function chunkText(text: string, chunkSize = 500): string[] {
+function chunkText(text: string, chunkSize = 2000): string[] {
   const words = text.split(/\s+/)
   const chunks: string[] = []
   for (let i = 0; i < words.length; i += chunkSize) {
