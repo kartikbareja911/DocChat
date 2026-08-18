@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Outer container (Black background with subtle border) -->
+  <rect width="32" height="32" rx="7" fill="#0B0B0C" stroke="#222227" stroke-width="1" />
+  <!-- Overlapping sheets -->
+  <path d="M8 8h10l6 6v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" fill="#FFFFFF" />
+  <path d="M11 11h7.5l4.5 4.5v6.5a1 1 0 0 1-1 1H11a1 1 0 0 1-1-1V12a1 1 0 0 1 1-1z" fill="#0B0B0C" />
+  <!-- Inner chat lines -->
+  <path d="M13 15h6M13 18h4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+</svg>

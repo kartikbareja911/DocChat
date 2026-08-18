@@ -1,0 +1,17 @@
+{
+  "name": "DocChat AI",
+  "short_name": "DocChat",
+  "description": "Upload documents and chat with them using AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0B0C",
+  "theme_color": "#2563EB",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
