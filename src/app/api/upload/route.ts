@@ -53,6 +53,14 @@ async function getEmbeddings(texts: string[]): Promise<number[][]> {
 
     if (!res.ok) {
       const errorText = await res.text()
+      if (res.status === 429) {
+        try {
+          const parsed = JSON.parse(errorText)
+          if (parsed.detail && parsed.detail.includes('payment method')) {
+            throw new Error('Voyage AI Rate Limit: Please add a billing card in your Voyage AI Dashboard (https://dashboard.voyageai.com) to unlock standard rate limits, or wait 1 minute before uploading.')
+          }
+        } catch (_) {}
+      }
       throw new Error(`Voyage AI API error: ${res.status} ${errorText}`)
     }
 
