@@ -1,13 +1,14 @@
-import { PDFParse } from 'pdf-parse'
+import { extractText, getDocumentProxy } from 'unpdf'
 import mammoth from 'mammoth'
 
 export async function extractTextFromFile(fileName: string, mimeType: string, buffer: Buffer): Promise<string> {
   const extension = fileName.split('.').pop()?.toLowerCase()
 
   if (extension === 'pdf' || mimeType === 'application/pdf') {
-    const parser = new PDFParse({ data: buffer })
-    const result = await parser.getText()
-    return result.text
+    // getDocumentProxy parses the PDF buffer safely in serverless environments
+    const pdf = await getDocumentProxy(new Uint8Array(buffer))
+    const { text } = await extractText(pdf, { mergePages: true })
+    return text
   }
 
   if (extension === 'docx' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
